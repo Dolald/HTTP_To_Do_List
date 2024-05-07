@@ -85,4 +85,6 @@ func decodeRequest(w http.ResponseWriter, r *http.Request) todos {
 		w.WriteHeader(http.StatusBadRequest) // Пишем в заголовок, что всё плохо
 	}
 	return newTodo
+	//
+	//
 }
