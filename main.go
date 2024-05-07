@@ -20,7 +20,7 @@ func main() {
 
 		switch r.Method {
 		case http.MethodGet:
-			getAllTasks(w)uyyyyyyyy8
+			getAllTasks(w)
 		case http.MethodPost:
 			postTask(w, r)
 		case http.MethodPut:
