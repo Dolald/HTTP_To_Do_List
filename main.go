@@ -5,6 +5,8 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+
+	"github.com/gorilla/mux"
 )
 
 type todos struct {
@@ -13,76 +15,87 @@ type todos struct {
 }
 
 var todo []todos
+var a any
 
 func main() {
+	router := mux.NewRouter()
 
-	http.HandleFunc("/todos/", func(w http.ResponseWriter, r *http.Request) {
+	router.HandleFunc("/todos", getAllTasks).Methods("GET")
+	router.HandleFunc("/todos", createTask).Methods("POST")
+	router.HandleFunc("/todos/{id}", editTask).Methods("PUT")
+	router.HandleFunc("/todos/{id}", deleteTask).Methods("DELETE")
 
-		switch r.Method {
-		case http.MethodGet:
-			getAllTasks(w)
-		case http.MethodPost:
-			postTask(w, r)
-		case http.MethodPut:
-			putTask(w, r)
-		case http.MethodDelete:
-			deleteTask(w, r)
-		default:
-			http.Error(w, "Metod not found", http.StatusBadRequest)
-			return
-		}
-		defer r.Body.Close()
-	})
-	http.ListenAndServe(":8080", nil)
+	err := http.ListenAndServe(":8080", router)
+	if err != nil {
+		log.Fatal("Error starting server: ", err)
+	}
 }
 
-func getAllTasks(w http.ResponseWriter) {
-	sendingJson, _ := json.Marshal(todo)               // Преобразуем массив структур в формат json
-	w.Header().Set("Content-type", "application/json") // Появляется красивый сайт, а не пустой сайт, можно и без этого
-	w.WriteHeader(http.StatusOK)                       // Пишем в заголовок, что всё норм
-	w.Write(sendingJson)                               // Пишем в ответ
+func getAllTasks(w http.ResponseWriter, r *http.Request) {
+	sendingJson, err := json.Marshal(todo)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Invalid task ID", http.StatusBadRequest)
+	}
+	w.Header().Set("Content-type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(sendingJson)
 }
 
-func postTask(w http.ResponseWriter, r *http.Request) {
-	newTodo := decodeRequest(w, r)
+func createTask(w http.ResponseWriter, r *http.Request) {
+	newTodo, err := decodeRequest(w, r)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Invalid task ID", http.StatusBadRequest)
+	}
 	todo = append(todo, newTodo)
-	w.WriteHeader(http.StatusOK) // Пишем в заголовок, что всё норм
+	w.WriteHeader(http.StatusOK)
 }
 
-func putTask(w http.ResponseWriter, r *http.Request) {
-	taskIndex := getIndexTask(w, r)
-	newTodo := decodeRequest(w, r)
+func editTask(w http.ResponseWriter, r *http.Request) {
+	taskIndex, err := getIndexTask(w, r)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Invalid task ID", http.StatusBadRequest)
+	}
+	newTodo, err := decodeRequest(w, r)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Invalid task ID", http.StatusBadRequest)
+	}
 	todo[taskIndex] = newTodo
 	w.WriteHeader(http.StatusOK)
 }
 
 func deleteTask(w http.ResponseWriter, r *http.Request) {
-	taskIndex := getIndexTask(w, r)
-	todo = append(todo[:taskIndex], todo[taskIndex+1:]...) // уменьшаем слайс у учётом сдвижения на один индекс
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func getIndexTask(w http.ResponseWriter, r *http.Request) int {
-	indexId := r.URL.Path[len("/todos/"):]
-	taskIndex, err := strconv.Atoi(indexId)
+	taskIndex, err := getIndexTask(w, r)
 	if err != nil {
 		log.Println(err)
 		http.Error(w, "Invalid task ID", http.StatusBadRequest)
 	}
 
-	if taskIndex < 0 || taskIndex >= len(todo) {
-		http.Error(w, "Task not found", http.StatusNotFound)
-	}
-	return taskIndex
+	todo = append(todo[:taskIndex], todo[taskIndex+1:]...)
+	w.WriteHeader(http.StatusNoContent)
 }
 
-func decodeRequest(w http.ResponseWriter, r *http.Request) todos {
-	decodedRequest := json.NewDecoder(r.Body) // распаршиваем тело запроса
-	var newTodo todos
-	err := decodedRequest.Decode(&newTodo) // из распаршенного тела запроса кодируем в указатель структуру newTodo
+func getIndexTask(w http.ResponseWriter, r *http.Request) (int, error) {
+	vars := mux.Vars(r)
+	taskIndex, err := strconv.Atoi(vars["id"])
 	if err != nil {
 		log.Println(err)
-		w.WriteHeader(http.StatusBadRequest) // Пишем в заголовок, что всё плохо
+		http.Error(w, "Invalid task ID", http.StatusBadRequest)
 	}
-	return newTodo
+	return taskIndex, nil
+}
+
+func decodeRequest(w http.ResponseWriter, r *http.Request) (todos, error) {
+	decodedRequest := json.NewDecoder(r.Body)
+	var newTodo todos
+	err := decodedRequest.Decode(&newTodo)
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusNotFound)
+		return newTodo, err
+	}
+	return newTodo, nil
 }
