@@ -36,7 +36,7 @@ func getAllTasks(w http.ResponseWriter, r *http.Request) {
 	sendingJson, err := json.Marshal(todo)
 	if err != nil {
 		log.Println(err)
-		http.Error(w, "Invalid method", http.StatusBadRequest)
+		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
 	w.Header().Set("Content-type", "application/json")
@@ -44,29 +44,28 @@ func getAllTasks(w http.ResponseWriter, r *http.Request) {
 	w.Write(sendingJson)
 }
 
-func createTask(w http.ResponseWriter, r *http.Request) []todos {
+func createTask(w http.ResponseWriter, r *http.Request) {
 	newTodo, err := decodeRequest(w, r)
 	if err != nil {
 		log.Println(err)
-		http.Error(w, "Invalid task ID", http.StatusBadRequest)
-		return todo
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
 	}
 	todo = append(todo, newTodo)
 	w.WriteHeader(http.StatusOK)
-	return todo
+
 }
 
 func editTask(w http.ResponseWriter, r *http.Request) {
 	taskIndex, err := getIndexTask(w, r)
 	if err != nil {
 		log.Println(err)
-		http.Error(w, "Invalid task ID", http.StatusBadRequest)
 		return
 	}
 	newTodo, err := decodeRequest(w, r)
 	if err != nil {
 		log.Println(err)
-		http.Error(w, "Invalid task ID", http.StatusBadRequest)
+		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
 	todo[taskIndex] = newTodo
@@ -77,7 +76,6 @@ func deleteTask(w http.ResponseWriter, r *http.Request) {
 	taskIndex, err := getIndexTask(w, r)
 	if err != nil {
 		log.Println(err)
-		http.Error(w, "Invalid task ID", http.StatusBadRequest)
 		return
 	}
 
@@ -85,12 +83,17 @@ func deleteTask(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func getIndexTask(w http.ResponseWriter, r *http.Request) (int, error) {
+func getIndexTask(w http.ResponseWriter, r *http.Request) (int, error) { //
 	vars := mux.Vars(r)
 	taskIndex, err := strconv.Atoi(vars["id"])
 	if err != nil {
 		log.Println(err)
 		http.Error(w, "Invalid task ID", http.StatusBadRequest)
+		return taskIndex, err
+	}
+	if taskIndex < 0 || taskIndex >= len(todo) {
+		http.Error(w, "Task not found", http.StatusNotFound)
+		return taskIndex, err
 	}
 	return taskIndex, nil
 }
